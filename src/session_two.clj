@@ -65,20 +65,8 @@
        (distinct)))
 
 
-(defn- calculate-profit-by-category
-  [orders set-of-categories]
-  (let [filter-by-categories (fn [order]
-                               (if (empty? set-of-categories)
-                                 true
-                                 (contains? set-of-categories (:category order))))]
-    (->> orders
-         (filter filter-by-categories)
-         (map #(if (nil? (:profit %)) 0.0 (:profit %)))
-         (reduce +))))
-
-
-(defn- calculate-by-field
-  [orders field-to-calculate field-to-filter-by field-values ]
+(defn- reduce-by-applying-to-field
+  [orders pred field-to-calculate field-to-filter-by field-values]
   (let [filter-by-field (fn [order]
                           (if (empty? field-values)
                             true
@@ -86,7 +74,18 @@
     (->> orders
          (filter filter-by-field)
          (map #(if (nil? (get % field-to-calculate)) 0.0 (get % field-to-calculate)))
-         (reduce +))))
+         (apply pred))))
+
+
+(defn- calculate-profit-by-category
+  [orders set-of-categories]
+  (reduce-by-applying-to-field orders + :profit :category set-of-categories))
+
+
+(defn- calculate-by-field
+  [orders field-to-calculate field-to-filter-by field-values]
+  (reduce-by-applying-to-field orders + field-to-calculate field-to-filter-by field-values))
+
 
 
 (comment
@@ -120,4 +119,14 @@
   (-> (get-orders)
       (calculate-by-field :sales :state #{"Kentucky" "Florida"}))
 
+
+  ;; PART 5
+  (defn average
+    "Usage (average 2 2 4 4)"
+    ([] 0)
+    ([& vs]
+     (double (/ (apply + vs) (count vs)))))
+
+  (-> (get-orders)
+      (reduce-by-applying-to-field average :sales :category #{:Furniture/Bookcases :Furniture/Chairs :Furniture/Tables}))
   )
