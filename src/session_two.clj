@@ -4,7 +4,16 @@
             [clojure.instant :as inst]
             [camel-snake-kebab.core :as csk]))
 
-(defonce orders (atom []))
+(defonce *filename (atom nil))
+(defonce *orders (atom []))
+
+
+(defn- average
+  "Usage (average 2 2 4 4)"
+  ([] 0)
+  ([& vs]
+   (double (/ (apply + vs) (count vs)))))
+
 
 
 (defn read-lines-from-file!
@@ -47,22 +56,27 @@
 
 
 (defn- get-orders
-  []
-  (if (empty? @orders)
-    (->> (read-lines-from-file!)
-         (rest)
-         (map #(str/split % #","))
-         (map #(zipmap (get-header-row) %))
-         (map parse-values)
-         (swap! orders concat))
-    @orders))
+  ([]
+   (get-orders "Orders.csv"))
+  ([filename]
+   (if (or (not= @*filename filename)
+           (empty? @*orders))
+     (do
+       (reset! *filename filename)
+       (->> (read-lines-from-file! filename)
+            (rest)
+            (map #(str/split % #","))
+            (map #(zipmap (get-header-row) %))
+            (map parse-values)
+            (swap! *orders concat)))
+     @*orders)))
 
 
 (defn get-unique-values-for
   [orders column-name]
   (->> orders
        (map #(get % column-name))
-       (distinct)))
+       (set)))
 
 
 (defn- reduce-by-applying-to-field
@@ -77,6 +91,17 @@
          (apply pred))))
 
 
+(defn- get-report
+  [filename]
+  (let [orders (get-orders filename)]
+    {:total-rows (count orders)
+     :categories (get-unique-values-for orders :category)
+     :ship-modes (get-unique-values-for orders :ship-mode)
+     :total-sales (reduce-by-applying-to-field orders + :sales :category #{})
+     :total-profit-on-book-cases (reduce-by-applying-to-field orders + :profit :category #{"Furniture/Bookcases"})
+     :avg-discount-in-the-south (reduce-by-applying-to-field orders average :discount :region #{"South"})}))
+
+
 (defn- calculate-profit-by-category
   [orders set-of-categories]
   (reduce-by-applying-to-field orders + :profit :category set-of-categories))
@@ -85,8 +110,6 @@
 (defn- calculate-by-field
   [orders field-to-calculate field-to-filter-by field-values]
   (reduce-by-applying-to-field orders + field-to-calculate field-to-filter-by field-values))
-
-
 
 (comment
 
@@ -121,12 +144,15 @@
 
 
   ;; PART 5
-  (defn average
-    "Usage (average 2 2 4 4)"
-    ([] 0)
-    ([& vs]
-     (double (/ (apply + vs) (count vs)))))
 
   (-> (get-orders)
       (reduce-by-applying-to-field average :sales :category #{:Furniture/Bookcases :Furniture/Chairs :Furniture/Tables}))
+
+
+  ;; PART 6
+  (-> (get-report "Orders.csv")
+      (clojure.pprint/pprint))
+
+
+  ;; END
   )
