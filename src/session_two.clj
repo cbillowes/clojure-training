@@ -77,6 +77,18 @@
          (reduce +))))
 
 
+(defn- calculate-by-field
+  [orders field-to-calculate field-to-filter-by field-values ]
+  (let [filter-by-field (fn [order]
+                          (if (empty? field-values)
+                            true
+                            (contains? field-values (get order field-to-filter-by))))]
+    (->> orders
+         (filter filter-by-field)
+         (map #(if (nil? (get % field-to-calculate)) 0.0 (get % field-to-calculate)))
+         (reduce +))))
+
+
 (comment
 
   ;; PART 1
@@ -102,5 +114,10 @@
   (-> (get-orders)
       (calculate-profit-by-category #{:Furniture/Bookcases :Furniture/Chairs :Furniture/Tables})
       (clojure.pprint/pprint))
+
+
+  ;; PART 4
+  (-> (get-orders)
+      (calculate-by-field :sales :state #{"Kentucky" "Florida"}))
 
   )
